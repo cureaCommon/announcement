@@ -46,7 +46,7 @@ public class ReviewNotifier {
             message.setSubject(revision ? "Onay bekleyen duyuru değişikliği: " + title : "Onay bekleyen duyuru: " + title);
             message.setText((revision ? "Yayındaki bir duyuruda yapılan değişiklik onayınızı bekliyor." : "Yeni bir duyuru onayınızı bekliyor.")
                     + "\n\nBaşlık: " + title
-                    + "\nİncelemek için: " + frontendBaseUrl + "/announcements/manage?tab=review");
+                    + "\nİncelemek için: " + frontendBaseUrl + "/duyurular/yonetim?sekme=onay");
             sender.send(message);
         } catch (RuntimeException ex) {
             logger.warn("Review notification mail could not be sent for announcement {}", announcementId, ex);
