@@ -1,0 +1,12 @@
+/.gradle*
+/.idea*
+build/
+.DS_Store
+**/.DS_Store
+logs/
+*.log
+*.log.gz
+.idea/
+*.iml
+
+src/main/resources/application-local.properties

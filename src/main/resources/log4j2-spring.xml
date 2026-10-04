@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="WARN">
+
+    <Properties>
+        <Property name="SERVICE_NAME">announcement</Property>
+        <Property name="LOG_DIR">logs</Property>
+        <Property name="LOG_PATTERN">%d{yyyy-MM-dd HH:mm:ss.SSS} %-5p [%t] [%X{requestId}] %c{1.} - %m%n</Property>
+    </Properties>
+
+    <Appenders>
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout pattern="${LOG_PATTERN}"/>
+        </Console>
+
+        <RollingFile name="File"
+                     fileName="${LOG_DIR}/${SERVICE_NAME}.log"
+                     filePattern="${LOG_DIR}/${SERVICE_NAME}-%d{yyyy-MM-dd}-%i.log.gz">
+            <PatternLayout pattern="${LOG_PATTERN}"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1"/>
+                <SizeBasedTriggeringPolicy size="100 MB"/>
+            </Policies>
+            <DefaultRolloverStrategy max="20">
+                <Delete basePath="${LOG_DIR}" maxDepth="1">
+                    <IfFileName glob="${SERVICE_NAME}-*.log.gz"/>
+                    <IfLastModified age="30d"/>
+                </Delete>
+            </DefaultRolloverStrategy>
+        </RollingFile>
+
+        <EnvironmentArbiter propertyName="LOGSTASH_HOST">
+            <Socket name="LogstashSocket"
+                    host="${env:LOGSTASH_HOST}"
+                    port="${env:LOGSTASH_PORT:-5000}"
+                    protocol="TCP"
+                    reconnectDelayMillis="10000"
+                    immediateFail="false"
+                    ignoreExceptions="true">
+                <JsonTemplateLayout eventTemplateUri="classpath:LogstashJsonEventLayoutV1.json">
+                    <EventTemplateAdditionalField key="service" value="${SERVICE_NAME}"/>
+                </JsonTemplateLayout>
+            </Socket>
+            <Async name="Logstash" blocking="false" bufferSize="1024" shutdownTimeout="1000">
+                <AppenderRef ref="LogstashSocket"/>
+            </Async>
+        </EnvironmentArbiter>
+    </Appenders>
+
+    <Loggers>
+        <Root level="info">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="File"/>
+            <EnvironmentArbiter propertyName="LOGSTASH_HOST">
+                <AppenderRef ref="Logstash"/>
+            </EnvironmentArbiter>
+        </Root>
+    </Loggers>
+</Configuration>
