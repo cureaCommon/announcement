@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -79,7 +80,8 @@ public class AnnouncementService {
             throw new ApiException(HttpStatus.NOT_FOUND, "ANNOUNCEMENT_NOT_FOUND");
         }
         return new PublicAnnouncementDetail(announcement.getId(), announcement.getTitle(), announcement.getSummary(), announcement.getBody(),
-                announcement.getPublishDate(), announcement.getExpireDate(), announcement.isPinned(),
+                announcement.getPublishDate(), announcement.getExpireDate(), announcement.getPublishTime(), announcement.getExpireTime(),
+                announcement.isPinned(),
                 announcement.getAudienceType(), sortedRoles(announcement.getAudienceRoles()),
                 announcement.getAttachments().stream().map(AttachmentView::of).toList(), isExpired(announcement, now));
     }
@@ -351,9 +353,19 @@ public class AnnouncementService {
     }
 
     private void applySchedule(Announcement announcement) {
-        announcement.setPublishAt(announcement.getPublishDate().atStartOfDay(ZONE).toInstant());
-        announcement.setExpireAt(announcement.getExpireDate() == null ? null
-                : announcement.getExpireDate().plusDays(1).atStartOfDay(ZONE).toInstant());
+        announcement.setPublishAt(startOf(announcement.getPublishDate(), announcement.getPublishTime()));
+        announcement.setExpireAt(endOf(announcement.getExpireDate(), announcement.getExpireTime()));
+    }
+
+    private static Instant startOf(LocalDate date, LocalTime time) {
+        return date.atTime(time == null ? LocalTime.MIDNIGHT : time).atZone(ZONE).toInstant();
+    }
+
+    private static Instant endOf(LocalDate date, LocalTime time) {
+        if (date == null) {
+            return null;
+        }
+        return time == null ? date.plusDays(1).atStartOfDay(ZONE).toInstant() : date.atTime(time).atZone(ZONE).toInstant();
     }
 
     private void applyRequest(AnnouncementContent target, AnnouncementRequest request) {
@@ -381,7 +393,10 @@ public class AnnouncementService {
         if (HtmlSanitizer.imageIds(body).size() > MAX_IMAGES) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "TOO_MANY_IMAGES");
         }
-        if (request.publishDate() != null && request.expireDate() != null && request.expireDate().isBefore(request.publishDate())) {
+        LocalTime publishTime = request.publishDate() == null ? null : request.publishTime();
+        LocalTime expireTime = request.expireDate() == null ? null : request.expireTime();
+        if (request.publishDate() != null && request.expireDate() != null
+                && !endOf(request.expireDate(), expireTime).isAfter(startOf(request.publishDate(), publishTime))) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_DATE_RANGE");
         }
         if (request.audienceType() == null) {
@@ -408,6 +423,8 @@ public class AnnouncementService {
         target.setBody(body);
         target.setPublishDate(request.publishDate());
         target.setExpireDate(request.expireDate());
+        target.setPublishTime(publishTime == null ? null : publishTime.withSecond(0).withNano(0));
+        target.setExpireTime(expireTime == null ? null : expireTime.withSecond(0).withNano(0));
         target.setPinRequested(Boolean.TRUE.equals(request.pinRequested()));
         target.setAudienceType(request.audienceType());
         target.getAudienceRoles().clear();
@@ -481,11 +498,11 @@ public class AnnouncementService {
         Instant now = Instant.now();
         AnnouncementRevision r = a.getRevision();
         RevisionView revision = r == null ? null : new RevisionView(r.getStatus(), r.getTitle(), r.getSummary(), r.getBody(), r.getPublishDate(),
-                r.getExpireDate(), r.isPinRequested(), r.getAudienceType(), sortedRoles(r.getAudienceRoles()),
+                r.getExpireDate(), r.getPublishTime(), r.getExpireTime(), r.isPinRequested(), r.getAudienceType(), sortedRoles(r.getAudienceRoles()),
                 r.getAttachments().stream().map(AttachmentView::of).toList(), r.getRejectReason(), r.getSubmittedAt(), r.getUpdatedOn());
         boolean scheduled = a.getStatus() == AnnouncementStatus.PUBLISHED && a.getPublishAt() != null && a.getPublishAt().isAfter(now);
         return new ManageAnnouncementView(a.getId(), a.getStatus(), scheduled, isExpired(a, now), a.getTitle(), a.getSummary(), a.getBody(),
-                a.getPublishDate(), a.getExpireDate(), a.isPinned(), a.isPinRequested(), a.getAudienceType(),
+                a.getPublishDate(), a.getExpireDate(), a.getPublishTime(), a.getExpireTime(), a.isPinned(), a.isPinRequested(), a.getAudienceType(),
                 sortedRoles(a.getAudienceRoles()), a.getAttachments().stream().map(AttachmentView::of).toList(),
                 a.getCreatedBy(), a.getCreatedOn(), a.getUpdatedOn(), a.getSubmittedAt(), a.getReviewedAt(), a.getRejectReason(), revision);
     }

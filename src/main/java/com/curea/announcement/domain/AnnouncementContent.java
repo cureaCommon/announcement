@@ -1,6 +1,7 @@
 package com.curea.announcement.domain;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Set;
 
@@ -11,6 +12,8 @@ public interface AnnouncementContent {
     String getBody();
     LocalDate getPublishDate();
     LocalDate getExpireDate();
+    LocalTime getPublishTime();
+    LocalTime getExpireTime();
     boolean isPinRequested();
     AudienceType getAudienceType();
     Set<String> getAudienceRoles();
@@ -21,6 +24,8 @@ public interface AnnouncementContent {
     void setBody(String body);
     void setPublishDate(LocalDate publishDate);
     void setExpireDate(LocalDate expireDate);
+    void setPublishTime(LocalTime publishTime);
+    void setExpireTime(LocalTime expireTime);
     void setPinRequested(boolean pinRequested);
     void setAudienceType(AudienceType audienceType);
 
@@ -30,6 +35,8 @@ public interface AnnouncementContent {
         setBody(source.getBody());
         setPublishDate(source.getPublishDate());
         setExpireDate(source.getExpireDate());
+        setPublishTime(source.getPublishTime());
+        setExpireTime(source.getExpireTime());
         setPinRequested(source.isPinRequested());
         setAudienceType(source.getAudienceType());
         getAudienceRoles().clear();

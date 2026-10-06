@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -35,6 +36,12 @@ public class AnnouncementRevision implements AnnouncementContent {
 
     @Column(name = "expire_date")
     private LocalDate expireDate;
+
+    @Column(name = "publish_time")
+    private LocalTime publishTime;
+
+    @Column(name = "expire_time")
+    private LocalTime expireTime;
 
     @Column(name = "pin_requested", nullable = false)
     private boolean pinRequested;
@@ -74,6 +81,10 @@ public class AnnouncementRevision implements AnnouncementContent {
     @Override public void setTitle(String title) { this.title = title; }
     @Override public String getBody() { return body; }
     @Override public void setBody(String body) { this.body = body; }
+    @Override public LocalTime getPublishTime() { return publishTime; }
+    @Override public void setPublishTime(LocalTime publishTime) { this.publishTime = publishTime; }
+    @Override public LocalTime getExpireTime() { return expireTime; }
+    @Override public void setExpireTime(LocalTime expireTime) { this.expireTime = expireTime; }
     @Override public LocalDate getPublishDate() { return publishDate; }
     @Override public void setPublishDate(LocalDate publishDate) { this.publishDate = publishDate; }
     @Override public LocalDate getExpireDate() { return expireDate; }
