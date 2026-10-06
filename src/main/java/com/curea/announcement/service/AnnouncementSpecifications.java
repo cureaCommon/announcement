@@ -60,6 +60,7 @@ public final class AnnouncementSpecifications {
         String pattern = "%" + normalize(text.trim()) + "%";
         return (root, query, cb) -> cb.or(
                 cb.like(normalized(cb, root.get("title")), pattern),
+                cb.like(normalized(cb, root.get("summary")), pattern),
                 cb.like(normalized(cb, root.get("body")), pattern));
     }
 

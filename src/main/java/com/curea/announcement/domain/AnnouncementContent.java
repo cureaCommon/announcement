@@ -7,6 +7,7 @@ import java.util.Set;
 public interface AnnouncementContent {
 
     String getTitle();
+    String getSummary();
     String getBody();
     LocalDate getPublishDate();
     LocalDate getExpireDate();
@@ -16,6 +17,7 @@ public interface AnnouncementContent {
     List<Attachment> getAttachments();
 
     void setTitle(String title);
+    void setSummary(String summary);
     void setBody(String body);
     void setPublishDate(LocalDate publishDate);
     void setExpireDate(LocalDate expireDate);
@@ -24,6 +26,7 @@ public interface AnnouncementContent {
 
     default void copyFrom(AnnouncementContent source) {
         setTitle(source.getTitle());
+        setSummary(source.getSummary());
         setBody(source.getBody());
         setPublishDate(source.getPublishDate());
         setExpireDate(source.getExpireDate());

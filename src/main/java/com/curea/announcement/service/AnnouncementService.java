@@ -27,6 +27,8 @@ public class AnnouncementService {
 
     public static final ZoneId ZONE = ZoneId.of("Europe/Istanbul");
     private static final int MAX_TITLE = 200;
+    private static final int MAX_SUMMARY = 250;
+    private static final int EXCERPT_LENGTH = 220;
     private static final int MAX_BODY = 100_000;
     private static final int MAX_ATTACHMENTS = 5;
     private static final int MAX_REASON = 1000;
@@ -74,7 +76,7 @@ public class AnnouncementService {
         if (!published || !audienceMatches(announcement, user)) {
             throw new ApiException(HttpStatus.NOT_FOUND, "ANNOUNCEMENT_NOT_FOUND");
         }
-        return new PublicAnnouncementDetail(announcement.getId(), announcement.getTitle(), announcement.getBody(),
+        return new PublicAnnouncementDetail(announcement.getId(), announcement.getTitle(), announcement.getSummary(), announcement.getBody(),
                 announcement.getPublishDate(), announcement.getExpireDate(), announcement.isPinned(),
                 announcement.getAudienceType(), sortedRoles(announcement.getAudienceRoles()),
                 announcement.getAttachments().stream().map(AttachmentView::of).toList(), isExpired(announcement, now));
@@ -363,6 +365,10 @@ public class AnnouncementService {
         if (title.length() > MAX_TITLE) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "TITLE_TOO_LONG");
         }
+        String summary = request.summary() == null ? "" : request.summary().replaceAll("\\s+", " ").trim();
+        if (summary.length() > MAX_SUMMARY) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "SUMMARY_TOO_LONG");
+        }
         String body = HtmlSanitizer.sanitize(request.body());
         if (HtmlSanitizer.plainText(body).isEmpty()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "BODY_REQUIRED");
@@ -393,6 +399,7 @@ public class AnnouncementService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "TOO_MANY_ATTACHMENTS");
         }
         target.setTitle(title);
+        target.setSummary(summary.isEmpty() ? null : summary);
         target.setBody(body);
         target.setPublishDate(request.publishDate());
         target.setExpireDate(request.expireDate());
@@ -450,19 +457,22 @@ public class AnnouncementService {
     private ManageAnnouncementView toManageView(Announcement a) {
         Instant now = Instant.now();
         AnnouncementRevision r = a.getRevision();
-        RevisionView revision = r == null ? null : new RevisionView(r.getStatus(), r.getTitle(), r.getBody(), r.getPublishDate(),
+        RevisionView revision = r == null ? null : new RevisionView(r.getStatus(), r.getTitle(), r.getSummary(), r.getBody(), r.getPublishDate(),
                 r.getExpireDate(), r.isPinRequested(), r.getAudienceType(), sortedRoles(r.getAudienceRoles()),
                 r.getAttachments().stream().map(AttachmentView::of).toList(), r.getRejectReason(), r.getSubmittedAt(), r.getUpdatedOn());
         boolean scheduled = a.getStatus() == AnnouncementStatus.PUBLISHED && a.getPublishAt() != null && a.getPublishAt().isAfter(now);
-        return new ManageAnnouncementView(a.getId(), a.getStatus(), scheduled, isExpired(a, now), a.getTitle(), a.getBody(),
+        return new ManageAnnouncementView(a.getId(), a.getStatus(), scheduled, isExpired(a, now), a.getTitle(), a.getSummary(), a.getBody(),
                 a.getPublishDate(), a.getExpireDate(), a.isPinned(), a.isPinRequested(), a.getAudienceType(),
                 sortedRoles(a.getAudienceRoles()), a.getAttachments().stream().map(AttachmentView::of).toList(),
                 a.getCreatedBy(), a.getCreatedOn(), a.getUpdatedOn(), a.getSubmittedAt(), a.getReviewedAt(), a.getRejectReason(), revision);
     }
 
     private PublicAnnouncementSummary toSummary(Announcement a) {
-        String plain = HtmlSanitizer.plainText(a.getBody());
-        String excerpt = plain.length() > 220 ? plain.substring(0, 220).trim() + "…" : plain;
+        String excerpt = a.getSummary();
+        if (excerpt == null || excerpt.isBlank()) {
+            String plain = HtmlSanitizer.plainText(a.getBody());
+            excerpt = plain.length() > EXCERPT_LENGTH ? plain.substring(0, EXCERPT_LENGTH).trim() + "…" : plain;
+        }
         return new PublicAnnouncementSummary(a.getId(), a.getTitle(), excerpt, a.getPublishDate(), a.isPinned(),
                 a.getAudienceType(), sortedRoles(a.getAudienceRoles()), a.getAttachments().size());
     }

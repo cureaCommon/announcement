@@ -27,6 +27,9 @@ public class Announcement implements AnnouncementContent {
     @Column(name = "title", nullable = false, length = 200)
     private String title;
 
+    @Column(name = "summary", length = 250)
+    private String summary;
+
     @Column(name = "body", nullable = false, columnDefinition = "text")
     private String body;
 
@@ -96,6 +99,8 @@ public class Announcement implements AnnouncementContent {
     public Long getId() { return id; }
     public AnnouncementStatus getStatus() { return status; }
     public void setStatus(AnnouncementStatus status) { this.status = status; }
+    @Override public String getSummary() { return summary; }
+    @Override public void setSummary(String summary) { this.summary = summary; }
     @Override public String getTitle() { return title; }
     @Override public void setTitle(String title) { this.title = title; }
     @Override public String getBody() { return body; }
