@@ -28,6 +28,8 @@ public class AnnouncementService {
     public static final ZoneId ZONE = ZoneId.of("Europe/Istanbul");
     private static final int MAX_TITLE = 200;
     private static final int MAX_SUMMARY = 250;
+    private static final int MAX_IMAGES = 20;
+    private static final long MAX_IMAGE_BYTES = 5L * 1024 * 1024;
     private static final int EXCERPT_LENGTH = 220;
     private static final int MAX_BODY = 100_000;
     private static final int MAX_ATTACHMENTS = 5;
@@ -376,6 +378,9 @@ public class AnnouncementService {
         if (body.length() > MAX_BODY) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "BODY_TOO_LONG");
         }
+        if (HtmlSanitizer.imageIds(body).size() > MAX_IMAGES) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "TOO_MANY_IMAGES");
+        }
         if (request.publishDate() != null && request.expireDate() != null && request.expireDate().isBefore(request.publishDate())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_DATE_RANGE");
         }
@@ -420,14 +425,32 @@ public class AnnouncementService {
         } : "PRIVATE";
         List<String> roles = visible && announcement.getAudienceType() == AudienceType.ROLES
                 ? sortedRoles(announcement.getAudienceRoles()) : List.of();
+        List<String> liveImages = HtmlSanitizer.imageIds(announcement.getBody());
+        List<String> pendingImages = revisionIds != null && announcement.getRevision() != null
+                ? HtmlSanitizer.imageIds(announcement.getRevision().getBody()) : List.of();
+        Set<String> liveAll = new LinkedHashSet<>(live);
+        liveAll.addAll(liveImages);
+        Set<String> pendingAll = new LinkedHashSet<>(pending);
+        pendingAll.addAll(pendingImages);
+        pendingAll.removeAll(liveAll);
         List<DocumentClient.DocumentAccess> access = new ArrayList<>();
-        live.forEach(docId -> access.add(new DocumentClient.DocumentAccess(docId, visibility, roles)));
-        pending.stream().filter(docId -> !live.contains(docId))
-                .forEach(docId -> access.add(new DocumentClient.DocumentAccess(docId, "PRIVATE", List.of())));
+        liveAll.forEach(docId -> access.add(new DocumentClient.DocumentAccess(docId, visibility, roles)));
+        pendingAll.forEach(docId -> access.add(new DocumentClient.DocumentAccess(docId, "PRIVATE", List.of())));
 
         Map<String, DocumentClient.DocumentMetadata> metadata = documentClient
                 .sync(announcement.getId(), access, actor.id(), actor.roles()).stream()
                 .collect(Collectors.toMap(DocumentClient.DocumentMetadata::id, m -> m, (a, b) -> a));
+        Set<String> images = new LinkedHashSet<>(liveImages);
+        images.addAll(pendingImages);
+        for (String imageId : images) {
+            DocumentClient.DocumentMetadata meta = metadata.get(imageId);
+            if (meta == null || meta.mimeType() == null || !meta.mimeType().startsWith("image/")) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_IMAGE");
+            }
+            if (meta.size() != null && meta.size() > MAX_IMAGE_BYTES) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "IMAGE_TOO_LARGE");
+            }
+        }
 
         if (revisionIds == null) {
             replaceAttachments(announcement.getAttachments(), live, metadata);

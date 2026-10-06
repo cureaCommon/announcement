@@ -127,8 +127,10 @@ public class AnnouncementMaintenance {
             }
             Set<String> ids = new HashSet<>();
             announcement.get().getAttachments().stream().map(Attachment::getDocumentId).forEach(ids::add);
+            ids.addAll(HtmlSanitizer.imageIds(announcement.get().getBody()));
             if (announcement.get().getRevision() != null) {
                 announcement.get().getRevision().getAttachments().stream().map(Attachment::getDocumentId).forEach(ids::add);
+                ids.addAll(HtmlSanitizer.imageIds(announcement.get().getRevision().getBody()));
             }
             return ids;
         });

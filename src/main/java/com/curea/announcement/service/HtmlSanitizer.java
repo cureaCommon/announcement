@@ -8,9 +8,13 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public final class HtmlSanitizer {
 
@@ -34,6 +38,10 @@ public final class HtmlSanitizer {
     );
 
     private static final Set<HTML.Tag> DROP_CONTENT = Set.of(HTML.Tag.SCRIPT, HTML.Tag.STYLE);
+    private static final String UUID = "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}";
+    private static final Pattern IMAGE_SOURCE = Pattern.compile("^(?:https?://[^/\\s]+)?/api/documents/(" + UUID + ")/content$");
+    private static final Pattern IMAGE_TAG = Pattern.compile("<img src=\"/api/documents/(" + UUID + ")/content\"");
+    private static final int MAX_ALT = 200;
 
     private HtmlSanitizer() {
     }
@@ -49,6 +57,18 @@ public final class HtmlSanitizer {
             throw new IllegalStateException(e);
         }
         return collector.result();
+    }
+
+    public static List<String> imageIds(String sanitizedHtml) {
+        if (sanitizedHtml == null || sanitizedHtml.isEmpty()) {
+            return List.of();
+        }
+        Set<String> ids = new LinkedHashSet<>();
+        Matcher matcher = IMAGE_TAG.matcher(sanitizedHtml);
+        while (matcher.find()) {
+            ids.add(matcher.group(1));
+        }
+        return List.copyOf(ids);
     }
 
     public static String plainText(String sanitizedHtml) {
@@ -122,8 +142,17 @@ public final class HtmlSanitizer {
 
         @Override
         public void handleSimpleTag(HTML.Tag tag, MutableAttributeSet attributes, int pos) {
-            if (dropDepth == 0 && tag == HTML.Tag.BR) {
+            if (dropDepth > 0) {
+                return;
+            }
+            if (tag == HTML.Tag.BR) {
                 out.append("<br>");
+            } else if (tag == HTML.Tag.IMG) {
+                String id = imageId(attributes.getAttribute(HTML.Attribute.SRC));
+                if (id != null) {
+                    out.append("<img src=\"/api/documents/").append(id).append("/content\" alt=\"")
+                            .append(escape(alt(attributes.getAttribute(HTML.Attribute.ALT)))).append("\">");
+                }
             }
         }
 
@@ -142,6 +171,22 @@ public final class HtmlSanitizer {
                 }
             }
             return out.toString().replaceAll("<p></p>", "").trim();
+        }
+
+        private static String imageId(Object value) {
+            if (value == null) {
+                return null;
+            }
+            Matcher matcher = IMAGE_SOURCE.matcher(value.toString().trim());
+            return matcher.matches() ? matcher.group(1).toLowerCase(Locale.ROOT) : null;
+        }
+
+        private static String alt(Object value) {
+            if (value == null) {
+                return "";
+            }
+            String text = value.toString().replaceAll("\\s+", " ").trim();
+            return text.length() > MAX_ALT ? text.substring(0, MAX_ALT) : text;
         }
 
         private static String safeHref(Object value) {
