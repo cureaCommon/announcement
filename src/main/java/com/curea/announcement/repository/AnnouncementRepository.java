@@ -8,11 +8,15 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 public interface AnnouncementRepository extends JpaRepository<Announcement, Long>, JpaSpecificationExecutor<Announcement> {
 
     Optional<Announcement> findByIdAndDeletedFalse(Long id);
+
+    List<Announcement> findTop100ByDeletedFalseAndStatusAndExpireAtBeforeOrderByIdAsc(AnnouncementStatus status, Instant before);
 
     @Query("select count(a) from Announcement a left join a.revision r where a.deleted = false and (a.status = :status or r.status = :revisionStatus)")
     long countAwaitingReview(@Param("status") AnnouncementStatus status, @Param("revisionStatus") RevisionStatus revisionStatus);

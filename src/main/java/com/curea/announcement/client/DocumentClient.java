@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 
@@ -19,6 +20,7 @@ import java.util.Set;
 public class DocumentClient {
 
     private static final Logger logger = LoggerFactory.getLogger(DocumentClient.class);
+    private static final String OWNER_SERVICE = "announcement";
     private static final Set<String> FORWARDED_CODES = Set.of(
             "DOCUMENT_NOT_FOUND", "DOCUMENT_OWNED_BY_ANOTHER_RECORD", "DOCUMENT_NOT_UPLOADED_BY_USER");
 
@@ -26,6 +28,12 @@ public class DocumentClient {
     }
 
     public record DocumentMetadata(String id, String name, String mimeType, Long size) {
+    }
+
+    public record AttachedDocument(String id, String ownerId) {
+    }
+
+    private record RemoveRequest(String ownerService, String ownerId, List<String> ids) {
     }
 
     private record SyncRequest(String ownerService, String ownerId, List<DocumentAccess> documents,
@@ -51,7 +59,7 @@ public class DocumentClient {
             DocumentMetadata[] response = restClient.put()
                     .uri("/internal/documents/sync")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .body(new SyncRequest("announcement", String.valueOf(announcementId), documents, actorId, actorRoles))
+                    .body(new SyncRequest(OWNER_SERVICE, String.valueOf(announcementId), documents, actorId, actorRoles))
                     .retrieve()
                     .body(DocumentMetadata[].class);
             return response == null ? List.of() : List.of(response);
@@ -66,6 +74,26 @@ public class DocumentClient {
             logger.error("Document service sync failed", ex);
             throw new ApiException(HttpStatus.BAD_GATEWAY, "DOCUMENT_SERVICE_ERROR");
         }
+    }
+
+    public List<AttachedDocument> attachedSyncedBefore(Instant before) {
+        AttachedDocument[] response = restClient.get()
+                .uri(uri -> uri.path("/internal/documents/attached")
+                        .queryParam("ownerService", OWNER_SERVICE)
+                        .queryParam("syncedBefore", before.toString())
+                        .build())
+                .retrieve()
+                .body(AttachedDocument[].class);
+        return response == null ? List.of() : List.of(response);
+    }
+
+    public void remove(String ownerId, List<String> ids) {
+        restClient.post()
+                .uri("/internal/documents/remove")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(new RemoveRequest(OWNER_SERVICE, ownerId, ids))
+                .retrieve()
+                .toBodilessEntity();
     }
 
     private String extractCode(String body) {
