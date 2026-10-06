@@ -1,6 +1,7 @@
 package com.curea.announcement.service;
 
 import com.curea.announcement.client.DocumentClient;
+import com.curea.announcement.client.UserClient;
 import com.curea.announcement.config.CurrentUser;
 import com.curea.announcement.domain.*;
 import com.curea.announcement.repository.AnnouncementHistoryRepository;
@@ -40,15 +41,17 @@ public class AnnouncementService {
     private final AnnouncementRepository repository;
     private final AnnouncementHistoryRepository historyRepository;
     private final DocumentClient documentClient;
+    private final UserClient userClient;
     private final ReviewNotifier notifier;
     private final Set<String> allowedAudienceRoles;
 
     public AnnouncementService(AnnouncementRepository repository, AnnouncementHistoryRepository historyRepository,
-                               DocumentClient documentClient, ReviewNotifier notifier,
+                               DocumentClient documentClient, UserClient userClient, ReviewNotifier notifier,
                                @Value("${announcement.audience-roles:ADMIN,TUSEB_TTO,ANNOUNCEMENT_EDITOR}") String audienceRoles) {
         this.repository = repository;
         this.historyRepository = historyRepository;
         this.documentClient = documentClient;
+        this.userClient = userClient;
         this.notifier = notifier;
         this.allowedAudienceRoles = Arrays.stream(audienceRoles.split(",")).map(String::trim)
                 .filter(s -> !s.isEmpty()).collect(Collectors.toUnmodifiableSet());
@@ -112,8 +115,13 @@ public class AnnouncementService {
     @Transactional(readOnly = true)
     public List<HistoryView> history(CurrentUser user, Long id) {
         loadManaged(user, id);
-        return historyRepository.findByAnnouncementIdOrderByCreatedOnAsc(id).stream()
-                .map(h -> new HistoryView(h.getAction(), h.getActorId(), h.getNote(), h.getCreatedOn())).toList();
+        List<AnnouncementHistory> entries = historyRepository.findByAnnouncementIdOrderByCreatedOnAsc(id);
+        Set<Long> actorIds = entries.stream().map(AnnouncementHistory::getActorId)
+                .filter(actorId -> actorId != null && actorId > 0).collect(Collectors.toSet());
+        Map<Long, String> names = userClient.fullNames(actorIds);
+        return entries.stream()
+                .map(h -> new HistoryView(h.getAction(), h.getActorId(), names.get(h.getActorId()), h.getNote(), h.getCreatedOn()))
+                .toList();
     }
 
     @Transactional
