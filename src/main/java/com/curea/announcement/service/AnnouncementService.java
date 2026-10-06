@@ -85,7 +85,6 @@ public class AnnouncementService {
         return new PublicAnnouncementDetail(announcement.getId(), announcement.getTitle(), announcement.getSummary(), announcement.getBody(),
                 announcement.getPublishDate(), announcement.getExpireDate(), announcement.getPublishTime(), announcement.getExpireTime(),
                 announcement.isPinned(),
-                announcement.getAudienceType(), sortedRoles(announcement.getAudienceRoles()),
                 announcement.getAttachments().stream().map(AttachmentView::of).toList(), isExpired(announcement, now));
     }
 
@@ -522,7 +521,7 @@ public class AnnouncementService {
             excerpt = plain.length() > EXCERPT_LENGTH ? plain.substring(0, EXCERPT_LENGTH).trim() + "…" : plain;
         }
         return new PublicAnnouncementSummary(a.getId(), a.getTitle(), excerpt, a.getPublishDate(), a.isPinned(),
-                a.getAudienceType(), sortedRoles(a.getAudienceRoles()), a.getAttachments().size());
+                a.getAttachments().size());
     }
 
     private boolean audienceMatches(Announcement a, CurrentUser user) {
